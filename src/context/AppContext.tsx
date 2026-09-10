@@ -26,6 +26,12 @@ import {
   initialQuizResults,
 } from "../data/initialData";
 
+export interface RegisteredUser {
+  email: string;
+  password?: string;
+  profile: StudentProfile;
+}
+
 export interface AppNotification {
   id: string;
   title: string;
@@ -43,8 +49,9 @@ interface AppContextType {
   loginDemo: () => void;
   loginAsDemo: () => void;
   login: (email: string, pass: string) => boolean;
-  register: (data: Partial<StudentProfile>) => void;
+  register: (data: Partial<StudentProfile>, password?: string) => void;
   logout: () => void;
+  registeredUsers: RegisteredUser[];
   setIsParentMode: (val: boolean) => void;
   toggleParentModeWithPin: (pin: string) => boolean;
 
@@ -153,6 +160,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const [isLoggedIn, setIsLoggedIn] = useState<boolean>(() => {
     return localStorage.getItem("mendelmind_logged_in") !== "false";
+  });
+
+  const [registeredUsers, setRegisteredUsers] = useState<RegisteredUser[]>(() => {
+    const saved = localStorage.getItem("mendelmind_registered_users");
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        // fallback
+      }
+    }
+    return [
+      {
+        email: "demo@mendelmind.com",
+        password: "123",
+        profile: initialProfile,
+      },
+    ];
   });
 
   const [isParentMode, setIsParentMode] = useState<boolean>(false);
@@ -653,42 +679,112 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const login = (email: string, pass: string): boolean => {
-    if (email === "demo@mendelmind.com" || email.includes("@")) {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail) return false;
+
+    // Check demo credentials
+    if (cleanEmail === "demo@mendelmind.com" || cleanEmail === "mateo@mendelmind.com" || cleanEmail === "demo") {
       setProfile(initialProfile);
       setIsLoggedIn(true);
       setIsParentMode(false);
       setAuthModalOpen(false);
+      setActiveTab("dashboard");
       triggerCelebration();
+      addNotification({
+        title: "¡Bienvenido, Mateo! 🚀",
+        message: "Sesión iniciada con tu cuenta de 6.º de Primaria.",
+        type: "success",
+      });
       return true;
     }
+
+    // Check registered accounts
+    const matched = registeredUsers.find((u) => u.email.toLowerCase() === cleanEmail);
+    if (matched) {
+      setProfile(matched.profile);
+      setIsLoggedIn(true);
+      setIsParentMode(false);
+      setAuthModalOpen(false);
+      setActiveTab("dashboard");
+      triggerCelebration();
+      addNotification({
+        title: `¡Hola de nuevo, ${matched.profile.name}! 👋`,
+        message: "Has iniciado sesión correctamente.",
+        type: "success",
+      });
+      return true;
+    }
+
+    // If valid email format is provided, allow auto-creation/login
+    if (cleanEmail.includes("@")) {
+      const extractedName = cleanEmail.split("@")[0].replace(/[._-]/g, " ");
+      const capitalized = extractedName.charAt(0).toUpperCase() + extractedName.slice(1);
+      register(
+        {
+          name: capitalized || "Estudiante",
+          email: cleanEmail,
+        },
+        pass
+      );
+      return true;
+    }
+
     return false;
   };
 
-  const register = (data: Partial<StudentProfile>) => {
+  const register = (data: Partial<StudentProfile>, password?: string) => {
+    const cleanEmail = (data.email || `estudiante_${Date.now()}@mendelmind.com`).trim().toLowerCase();
+    const studentName = data.name?.trim() || "Estudiante";
+
     const newStudent: StudentProfile = {
       ...initialProfile,
-      name: data.name || "Estudiante",
-      lastName: data.lastName || "Mendel",
-      email: data.email || "estudiante@mendelmind.com",
+      id: "student-" + Date.now(),
+      name: studentName,
+      lastName: data.lastName?.trim() || "",
+      email: cleanEmail,
       age: data.age || 11,
       grade: data.grade || "6.º de Primaria",
-      parentName: data.parentName || "Tutor",
-      parentEmail: data.parentEmail || "tutor@email.com",
+      parentName: data.parentName?.trim() || "Tutor",
+      parentEmail: data.parentEmail?.trim() || "tutor@email.com",
       courses: data.courses || initialProfile.courses,
+      avatarId: "cosmo-owl",
+      avatarName: "Búho Sabio",
+      profileBackground: "gradient-indigo",
       level: 1,
-      levelTitle: "Explorador",
-      xp: 50,
-      papelPuntos: 100,
+      levelTitle: "Novato",
+      xp: 100,
+      xpToNextLevel: 300,
+      papelPuntos: 150, // Bono de bienvenida
       streakDays: 1,
+      streakFrozen: false,
+      weeklyProgressPercent: 10,
+      focusMinutesToday: 0,
+      screenTimeMinutesToday: 30,
+      screenTimeLimitMinutes: 180,
     };
+
+    const newAccount: RegisteredUser = {
+      email: cleanEmail,
+      password: password || "123456",
+      profile: newStudent,
+    };
+
+    setRegisteredUsers((prev) => {
+      const filtered = prev.filter((u) => u.email.toLowerCase() !== cleanEmail);
+      const updated = [...filtered, newAccount];
+      localStorage.setItem("mendelmind_registered_users", JSON.stringify(updated));
+      return updated;
+    });
+
     setProfile(newStudent);
     setIsLoggedIn(true);
     setIsParentMode(false);
     setAuthModalOpen(false);
+    setActiveTab("dashboard");
     triggerCelebration();
     addNotification({
       title: "¡Cuenta Creada con Éxito! 🎉",
-      message: `Bienvenido a MendelMind, ${newStudent.name}. ¡Comienza tu aventura!`,
+      message: `¡Bienvenido(a), ${newStudent.name}! Recibiste 150 PapelPuntos de regalo de bienvenida.`,
       type: "success",
     });
   };
@@ -738,6 +834,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         login,
         register,
         logout,
+        registeredUsers,
         setIsParentMode,
         toggleParentModeWithPin,
         addXP,

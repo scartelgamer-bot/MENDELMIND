@@ -8,6 +8,7 @@ import {
   Timer,
   Shield,
   User,
+  UserPlus,
   LogOut,
   ChevronDown,
   Lock,
@@ -224,6 +225,18 @@ export const Header: React.FC<HeaderProps> = ({ onOpenParentModal }) => {
                       >
                         <Lock className="w-4 h-4 text-slate-400" />
                         <span>Control Parental</span>
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          setAuthModalInitialMode("register");
+                          setAuthModalOpen(true);
+                          setProfileDropdownOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 flex items-center space-x-2"
+                      >
+                        <UserPlus className="w-4 h-4 text-slate-400" />
+                        <span>Registrar nuevo alumno / Cambiar</span>
                       </button>
 
                       <div className="border-t border-slate-100 my-1"></div>
