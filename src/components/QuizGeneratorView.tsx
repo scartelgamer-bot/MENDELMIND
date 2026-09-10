@@ -9,6 +9,7 @@ import {
   Trophy,
   Star,
   RotateCcw,
+  RefreshCw,
   ArrowRight,
   BookOpen,
   HelpCircle,
@@ -19,7 +20,7 @@ import {
 import { CourseName, QuizQuestion, QuizResult } from "../types";
 
 export const QuizGeneratorView: React.FC = () => {
-  const { profile, recordQuizResult, triggerCelebration } = useApp();
+  const { profile, recordQuizResult, triggerCelebration, addNotification } = useApp();
 
   // Generator form state
   const [course, setCourse] = useState<CourseName>("Matemática");
@@ -83,17 +84,19 @@ export const QuizGeneratorView: React.FC = () => {
     ],
   };
 
-  const handleGenerateQuiz = async () => {
+  const handleGenerateQuiz = async (overrideTopic?: string) => {
     setIsGenerating(true);
+    const activeTopic = overrideTopic || topic;
     try {
       const response = await fetch("/api/gemini/quiz", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           course,
-          topic,
+          topic: activeTopic,
           questionCount,
           difficulty,
+          randomSeed: `${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
         }),
       });
 
@@ -105,26 +108,18 @@ export const QuizGeneratorView: React.FC = () => {
               {
                 id: 1,
                 type: "multiple_choice",
-                question: "¿Cuál es la fracción equivalente a 2/4?",
-                options: ["1/2", "3/4", "1/4", "4/2"],
-                correctAnswer: "1/2",
-                explanation: "Al simplificar 2/4 dividiendo entre 2 el numerador y denominador se obtiene 1/2.",
+                question: `¿Cuál es una idea clave sobre ${activeTopic} en el curso de ${course}?`,
+                options: ["Comprender sus conceptos fundamentales", "Memorizar sin analizar", "Ignorar las definiciones", "No practicar con ejercicios"],
+                correctAnswer: "Comprender sus conceptos fundamentales",
+                explanation: `En 6.º de primaria, estudiar ${activeTopic} requiere comprender cada procedimiento paso a paso.`,
               },
               {
                 id: 2,
                 type: "true_false",
-                question: "En las fracciones propias, el numerador siempre es menor que el denominador.",
+                question: `El tema de ${activeTopic} tiene aplicaciones prácticas en la vida cotidiana de un estudiante de 6.° de primaria.`,
                 options: ["Verdadero", "Falso"],
                 correctAnswer: "Verdadero",
-                explanation: "Exacto, una fracción propia representa menos de un entero completo.",
-              },
-              {
-                id: 3,
-                type: "multiple_choice",
-                question: "¿Cuánto es 3/8 + 2/8?",
-                options: ["5/8", "5/16", "6/8", "1/8"],
-                correctAnswer: "5/8",
-                explanation: "Como tienen el mismo denominador, sumamos los numeradores: 3 + 2 = 5.",
+                explanation: "¡Exacto! Todo lo aprendido en la escuela se conecta con situaciones cotidianas y resolución de problemas.",
               },
             ];
 
@@ -134,8 +129,23 @@ export const QuizGeneratorView: React.FC = () => {
       setQuizFinished(false);
       setQuizResult(null);
       setStartTime(Date.now());
+
+      if (addNotification) {
+        addNotification({
+          title: "¡Cuestionario Listo! 🎯",
+          message: `${questions.length} preguntas de ${course} (${activeTopic}) preparadas.`,
+          type: "success",
+        });
+      }
     } catch (err) {
       console.error("Error generating quiz:", err);
+      if (addNotification) {
+        addNotification({
+          title: "Aviso de conexión",
+          message: "No se pudo conectar con el generador. Intenta de nuevo.",
+          type: "warning",
+        });
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -226,14 +236,41 @@ export const QuizGeneratorView: React.FC = () => {
     return (
       <div className="max-w-3xl mx-auto space-y-6 animate-fade-in">
         {/* Progress & Header */}
-        <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-xs">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-800">
-              {course} • {topic}
-            </span>
-            <div className="flex items-center space-x-2 text-xs font-bold text-slate-500">
-              <Clock className="w-4 h-4 text-blue-500" />
-              <span>Pregunta {currentQuestionIndex + 1} de {activeQuizQuestions.length}</span>
+        <div className="bg-white rounded-3xl p-5 sm:p-6 border border-slate-200 shadow-xs space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center space-x-2">
+              <span className="text-xs font-bold px-3 py-1 rounded-full bg-blue-100 text-blue-800">
+                {course} • {topic}
+              </span>
+              <span className="text-xs font-semibold text-slate-500 hidden sm:inline">
+                Nivel {difficulty}
+              </span>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => handleGenerateQuiz()}
+                disabled={isGenerating}
+                className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-800 text-xs font-bold flex items-center space-x-1.5 transition-colors disabled:opacity-50"
+                title="Generar nuevas preguntas de este mismo tema con IA"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isGenerating ? "animate-spin" : ""}`} />
+                <span>{isGenerating ? "Regenerando..." : "Regenerar preguntas"}</span>
+              </button>
+
+              <button
+                onClick={handleRestart}
+                className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-bold flex items-center space-x-1 transition-colors"
+                title="Salir al configurador de cuestionarios"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Cambiar tema</span>
+              </button>
+
+              <div className="flex items-center space-x-1.5 text-xs font-bold text-slate-500 pl-2 border-l border-slate-200">
+                <Clock className="w-4 h-4 text-blue-500" />
+                <span>{currentQuestionIndex + 1}/{activeQuizQuestions.length}</span>
+              </div>
             </div>
           </div>
 
@@ -452,7 +489,7 @@ export const QuizGeneratorView: React.FC = () => {
               className="px-5 py-3 rounded-2xl border border-slate-300 hover:bg-slate-50 text-slate-700 text-xs font-bold flex items-center space-x-2 transition-colors"
             >
               <RotateCcw className="w-4 h-4" />
-              <span>Crear otro cuestionario</span>
+              <span>Cambiar curso o tema</span>
             </button>
 
             <button
@@ -461,10 +498,11 @@ export const QuizGeneratorView: React.FC = () => {
                 setQuizFinished(false);
                 handleGenerateQuiz();
               }}
-              className="px-6 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 flex items-center space-x-2 transition-colors"
+              disabled={isGenerating}
+              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 disabled:opacity-50 text-white font-bold text-xs sm:text-sm shadow-md shadow-blue-500/20 flex items-center space-x-2 transition-all"
             >
-              <Zap className="w-4 h-4" />
-              <span>Reintentar con nuevas preguntas</span>
+              <Sparkles className={`w-4 h-4 ${isGenerating ? "animate-spin" : "text-amber-300"}`} />
+              <span>{isGenerating ? "Generando con IA..." : "Reintentar con nuevas preguntas (IA)"}</span>
             </button>
           </div>
         </div>
@@ -611,7 +649,7 @@ export const QuizGeneratorView: React.FC = () => {
           </div>
 
           <button
-            onClick={handleGenerateQuiz}
+            onClick={() => handleGenerateQuiz()}
             disabled={isGenerating}
             className="w-full sm:w-auto px-8 py-3.5 rounded-2xl bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-600 hover:opacity-95 text-white font-extrabold text-sm shadow-lg shadow-blue-500/25 flex items-center justify-center space-x-2 transition-all disabled:opacity-50"
           >

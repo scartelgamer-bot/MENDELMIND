@@ -113,6 +113,11 @@ export const AITutorView: React.FC = () => {
     if (!customText) setInputQuestion("");
     setIsLoading(true);
 
+    const currentHistory = messages.map((m) => ({
+      sender: m.sender,
+      text: m.text,
+    }));
+
     try {
       const response = await fetch("/api/gemini/tutor", {
         method: "POST",
@@ -121,6 +126,7 @@ export const AITutorView: React.FC = () => {
           question: query,
           subject: selectedSubject,
           studentName: profile?.name || "Estudiante",
+          conversationHistory: currentHistory,
         }),
       });
 
