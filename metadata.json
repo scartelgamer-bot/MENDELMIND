@@ -1,0 +1,6 @@
+{
+  "name": "MendelMind",
+  "description": "Aplicación educativa inteligente para estudiantes de 6.º de primaria con tutor IA, cuestionarios dinámicos, recompensas, tareas, tiempo de pantalla y control parental.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
